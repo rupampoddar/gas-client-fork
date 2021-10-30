@@ -54,12 +54,20 @@ export default class Server {
       });
     } catch (err) {
       if (typeof google === 'undefined') {
+        // we're in the dev server iframe
+
         // we'll store and access the resolve/reject functions here by id
         window.gasStore = {};
 
-        // this domain should be restricted to googleusercontent.com but the subdomain is variable
-        // supports window.location.origin as default for backward compatibility
-        let targetOrigin = config.parentTargetOrigin || window.location.origin;
+        // the parent (also an iframe) url.
+        // this domain should be restricted to googleusercontent.com,
+        // but the subdomain is variable supports window.location.origin
+        // as default for backward compatibility
+        // let targetOrigin = config.parentTargetOrigin || window.location.origin;
+        const targetOrigin =
+          window.location !== window.parent.location
+            ? document.referrer
+            : document.location.href;
 
         // set up the message 'receive' handler
         const receiveMessageHandler = (event) => {
@@ -87,9 +95,10 @@ export default class Server {
           }
           resolve(response);
         };
-
+        // listen for message event (sent from parent via postMessage)
         window.addEventListener('message', receiveMessageHandler, false);
 
+        // proxy handler
         const handler = {
           get(target, functionName) {
             const id = nanoid();
