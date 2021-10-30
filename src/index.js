@@ -54,7 +54,7 @@ export default class Server {
       });
     } catch (err) {
       if (typeof google === 'undefined') {
-        // we're in the dev server iframe
+        // we're in the dev iframe
 
         // we'll store and access the resolve/reject functions here by id
         window.gasStore = {};
@@ -64,39 +64,44 @@ export default class Server {
         // but the subdomain is variable supports window.location.origin
         // as default for backward compatibility
         // let targetOrigin = config.parentTargetOrigin || window.location.origin;
-        const targetOrigin =
+        const parentUrl =
           window.location !== window.parent.location
             ? document.referrer
             : document.location.href;
 
-        // set up the message 'receive' handler
-        const receiveMessageHandler = (event) => {
-          const { allowedDevelopmentDomains } = config;
-
-          // check the allow list for the receiving origin
-          const allowOrigin = checkAllowList(
-            allowedDevelopmentDomains,
-            event.origin
-          );
-          if (!allowOrigin) return;
-
-          // we only care about the type: 'RESPONSE' messages here
-          if (event.data.type !== 'RESPONSE') return;
-
-          const { response, status, id } = event.data;
-
-          // look up the saved resolve and reject funtions in our global store based
-          // on the response id, and call the function depending on the response status
-          const { resolve, reject } = window.gasStore[id];
-
-          if (status === 'ERROR') {
-            // TODO: return here so resolve doesn't get called on error
-            reject(response);
-          }
-          resolve(response);
-        };
         // listen for message event (sent from parent via postMessage)
-        window.addEventListener('message', receiveMessageHandler, false);
+        window.addEventListener(
+          'message',
+          (event) => {
+            const { allowedDevelopmentDomains } = config;
+
+            // check the allow list for the receiving origin
+            // const allowOrigin = checkAllowList(
+            //   allowedDevelopmentDomains,
+            //   event.origin
+            // );
+            // if (!allowOrigin) return;
+
+            // only proceed if message is sent from parent
+            if (event.origin !== parentUrl) return;
+
+            // we only care about the type: 'RESPONSE' messages here
+            if (event.data.type !== 'RESPONSE') return;
+
+            const { response, status, id } = event.data;
+
+            // look up the saved resolve and reject funtions in our global store based
+            // on the response id, and call the function depending on the response status
+            const { resolve, reject } = window.gasStore[id];
+
+            if (status === 'ERROR') {
+              // TODO: return here so resolve doesn't get called on error
+              reject(response);
+            }
+            resolve(response);
+          },
+          false
+        );
 
         // proxy handler
         const handler = {
@@ -115,7 +120,7 @@ export default class Server {
                   functionName,
                   args: [...args],
                 },
-                targetOrigin
+                parentUrl
               );
               return promise;
             };
