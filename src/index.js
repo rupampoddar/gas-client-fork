@@ -1,4 +1,4 @@
-import { v4 as uuidv4 } from 'uuid';
+import { nanoid } from 'nanoid';
 
 /**
  * Util that returns true if allowedDevelopmentDomains matches origin
@@ -92,7 +92,7 @@ export default class Server {
 
         const handler = {
           get(target, functionName) {
-            const id = uuidv4();
+            const id = nanoid();
             const promise = new Promise((resolve, reject) => {
               // store the new Promise's resolve and reject
               window.gasStore[id] = { resolve, reject };
