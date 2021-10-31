@@ -17,6 +17,13 @@ const checkAllowList = (allowedDevelopmentDomains, origin) => {
   return false;
 };
 
+/**
+ * Removes trailing slash from url
+ */
+const removeTrailingSlash = (url) => url.replace(/\/$/, '');
+
+const validateMessageOrigin = () => {};
+
 export default class Server {
   /**
    * Accepts a single `config` object
@@ -69,7 +76,7 @@ export default class Server {
             ? document.referrer
             : document.location.href;
 
-        // listen for message event (sent from parent via postMessage)
+        // listen for message event (should be sent from parent via postMessage)
         window.addEventListener(
           'message',
           (event) => {
@@ -83,7 +90,7 @@ export default class Server {
             // if (!allowOrigin) return;
 
             // only proceed if message is sent from parent
-            if (event.origin !== parentUrl) return;
+            if (event.origin !== removeTrailingSlash(parentUrl)) return;
 
             // we only care about the type: 'RESPONSE' messages here
             if (event.data.type !== 'RESPONSE') return;
@@ -103,30 +110,34 @@ export default class Server {
           false
         );
 
-        // proxy handler
-        const handler = {
-          get(target, functionName) {
-            const id = nanoid();
-            const promise = new Promise((resolve, reject) => {
-              // store the new Promise's resolve and reject
-              window.gasStore[id] = { resolve, reject };
-            });
-            return (...args) => {
-              // https://developer.mozilla.org/en-US/docs/Web/API/Window/postMessage
-              window.parent.postMessage(
-                {
-                  type: 'REQUEST',
-                  id,
-                  functionName,
-                  args: [...args],
-                },
-                parentUrl
-              );
-              return promise;
-            };
-          },
-        };
-        this.serverFunctions = new Proxy({}, handler);
+        // setup proxy object for the serverFunctions property.
+        // it's needed when the serverFunctions() is called from
+        // the child iframe
+        this.serverFunctions = new Proxy(
+          {},
+          {
+            get(target, functionName) {
+              const id = nanoid();
+              const promise = new Promise((resolve, reject) => {
+                // store the new Promise's resolve and reject
+                window.gasStore[id] = { resolve, reject };
+              });
+              return (...args) => {
+                // https://developer.mozilla.org/en-US/docs/Web/API/Window/postMessage
+                window.parent.postMessage(
+                  {
+                    type: 'REQUEST',
+                    id,
+                    functionName,
+                    args: [...args],
+                  },
+                  parentUrl
+                );
+                return promise;
+              };
+            },
+          }
+        );
       }
     }
   }
