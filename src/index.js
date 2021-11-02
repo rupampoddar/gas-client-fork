@@ -76,6 +76,8 @@ export default class Server {
             ? document.referrer
             : document.location.href;
 
+        window.parent.postMessage('GETTEMPLATEDATA', parentUrl);
+
         // listen for message event (should be sent from parent via postMessage)
         window.addEventListener(
           'message',
@@ -92,20 +94,30 @@ export default class Server {
             // only proceed if message is sent from parent
             if (event.origin !== removeTrailingSlash(parentUrl)) return;
 
-            // we only care about the type: 'RESPONSE' messages here
-            if (event.data.type !== 'RESPONSE') return;
+            // validate event data schema.
+            // schema-1: for calling google.script.run
+            // schema-2: for patching apps script scriptlets on dev iframe
 
-            const { response, status, id } = event.data;
+            if (event.data.type === 'RESPONSE') {
+              const { response, status, id } = event.data;
 
-            // look up the saved resolve and reject funtions in our global store based
-            // on the response id, and call the function depending on the response status
-            const { resolve, reject } = window.gasStore[id];
+              // look up the saved resolve and reject funtions in our global store based
+              // on the response id, and call the function depending on the response status
+              const { resolve, reject } = window.gasStore[id];
 
-            if (status === 'ERROR') {
-              // TODO: return here so resolve doesn't get called on error
-              reject(response);
+              if (status === 'ERROR') {
+                // TODO: return here so resolve doesn't get called on error
+                reject(response);
+              }
+              resolve(response);
+            } else if (event.data.templateData) {
+              document.getElementById('__TEMPLATE_DATA__').value = event.data.templateData;
+            } else {
+              return;
             }
-            resolve(response);
+
+            // we only care about the type: 'RESPONSE' messages here
+            // if (event.data.type !== 'RESPONSE') return;
           },
           false
         );
